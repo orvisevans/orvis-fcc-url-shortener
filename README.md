@@ -1,2 +1,1 @@
-# orvis-fcc-url-shortener
-Free Code Camp API Challenge 3
+# Backend Challenges boilerplate - package.json
