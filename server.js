@@ -11,7 +11,6 @@ const MONGODB_URI = 'mongodb://'+process.env.USER+':'+process.env.PASS+'@'+proce
 mongoose.connect(MONGODB_URI);
 
 const URLRedirect = mongoose.model("Url", {longUrl: String, redirectPath: String});
-const newUrlPrefix = "new";
 const pathLength = 4;
 
 
@@ -29,7 +28,7 @@ function getRedirect(longUrl, callback) {
   console.log("searching for existing redirect");
   if (!validUrl.isUri(longUrl)) { 
     callback({error: "not valid url"}); 
-    return console.error(longUrl + " isn't a valid url");
+    return console.log(longUrl + " isn't a valid url");
   }
   URLRedirect.findOne({longUrl: longUrl})
     .lean()
@@ -66,11 +65,17 @@ function newRedirect(longUrl, callback) {
   });
 }
 
-function ifRedirectExists(path, callback) {
+function redirectTo(path, callback) {
   URLRedirect.findOne({redirectPath: path})
     .lean()
     .exec((err, redirect) => {
       if (err) { return console.error("mongodb error: " + err); }
+      if (redirect === null) {
+        console.log("redirect does not exist: ", path);
+        callback({error: "no record"});
+        return
+      }
+      console.log("redirect already exists: ", redirect);
       callback(null, redirect);
   });
   
@@ -109,10 +114,11 @@ app.route('/')
     })
 
 // Register a url
-app.use('/' + newUrlPrefix + '/:url', (req, res) => {
-  console.log("registering new: " + req.params.url);
-  getRedirect(req.params.url, (err, redirect) => {
-    if (err) { res.send({url: "url error"}); return console.error(err); }
+app.get('/new/*', (req, res) => {
+  var newurl = req.path.slice(5);
+  console.log("registering new: " + newurl);
+  getRedirect(newurl, (err, redirect) => {
+    if (err) { res.send({url: "url error"}); return console.log(err); }
     res.send(generateApiRedirect(redirect));
   });
 });
@@ -120,10 +126,11 @@ app.use('/' + newUrlPrefix + '/:url', (req, res) => {
 // Return a shortened url
 app.use('/:path', (req, res) => {
   console.log("received a path: " + req.params.path);
-  ifRedirectExists(req.params.path, (err, redirect) => {
-    if (err) { res.status(500).send(err); return console.error(err); }
-    console.log("redirecting to " + redirect.redirectPath);
-    res.redirect(redirect.redirectPath);
+  redirectTo(req.params.path, (err, redirect) => {
+    if (err.error === "no record") { res.send(err); return; }
+    if (err) { res.status(500); return console.error(err); }
+    console.log("redirecting to " + redirect.longUrl);
+    res.redirect(redirect.longUrl);
   });
 });
 
