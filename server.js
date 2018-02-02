@@ -10,7 +10,7 @@ var app = express();
 const MONGODB_URI = 'mongodb://'+process.env.USER+':'+process.env.PASS+'@'+process.env.HOST+':'+process.env.DB_PORT+'/'+process.env.DB;
 mongoose.connect(MONGODB_URI);
 
-const URLRedirect = mongoose.model("Url", {longUrl: String, redirectPath: String});
+const URLRedirect = mongoose.model("Url", {longUrl: String, redirectPath: String, when: Date});
 const pathLength = 4;
 
 
@@ -35,7 +35,7 @@ function getRedirect(longUrl, callback) {
     .exec((err, redirect) => {
       if (err) { return console.error("mongodb error: " + err); }
       if (redirect) {
-        console.log('found redirect: ' + redirect.toString());
+        console.log('found redirect: ' + redirect.path);
         callback(null, redirect);
       } else {
         newRedirect(longUrl, callback);
@@ -57,7 +57,8 @@ function newRedirect(longUrl, callback) {
   console.log("Creating new redirect");
   var newRedirect = new URLRedirect({
     longUrl: longUrl,
-    redirectPath: generatePath()
+    redirectPath: generatePath(),
+    when: new Date()
   });
   newRedirect.save((err, URLRedirect) => {
     if (err) { return console.error("mongodb error: " + err); }
@@ -127,7 +128,7 @@ app.get('/new/*', (req, res) => {
 app.use('/:path', (req, res) => {
   console.log("received a path: " + req.params.path);
   redirectTo(req.params.path, (err, redirect) => {
-    if (err.error === "no record") { res.send(err); return; }
+    if (err && err.error === "no record") { res.send(err); return; }
     if (err) { res.status(500); return console.error(err); }
     console.log("redirecting to " + redirect.longUrl);
     res.redirect(redirect.longUrl);
